@@ -1,0 +1,109 @@
+import heapq
+class RobotAI:
+    def __init__(self, n, m, start_pos):
+        self.n, self.m = n, m
+        self.start_pos = start_pos
+        self.current_pos = start_pos
+        self.target_pos = None
+        self.discovered_map = {}  
+        self.visited = set()
+        self.exploration_path = []
+        self.total_steps = 0
+
+    def get_neighbors(self, pos, maze):
+        x, y = pos
+        neighbors = []
+        
+        for dx, dy in [(0, -1), (0, 1), (-1, 0), (1, 0)]:
+            nx, ny = x + dx, y + dy
+            if 0 <= nx < self.n and 0 <= ny < self.m:
+                if maze[nx][ny] == 0:  
+                    neighbors.append((nx, ny))
+        return neighbors
+
+    def explore(self, maze, target):
+        
+        stack = [self.start_pos]
+        self.visited.add(self.start_pos)
+        
+        while stack:
+            curr = stack.pop()
+            self.current_pos = curr
+            self.exploration_path.append(curr)
+            self.total_steps += 1
+            
+            
+            neighbors = self.get_neighbors(curr, maze)
+            self.discovered_map[curr] = neighbors
+
+            if curr == target:
+                self.target_pos = target
+                return True
+
+            for neighbor in neighbors:
+                if neighbor not in self.visited:
+                    self.visited.add(neighbor)
+                    stack.append(neighbor)
+        return False
+
+    def a_star(self, start, goal):
+        
+        def heuristic(a, b):
+            return abs(a[0] - b[0]) + abs(a[1] - b[1])
+
+        pq = [(0, start)]
+        came_from = {}
+        g_score = {start: 0}
+
+        while pq:
+            _, current = heapq.heappop(pq)
+
+            if current == goal:
+                path = []
+                while current in came_from:
+                    path.append(current)
+                    current = came_from[current]
+                return path[::-1]
+
+            for neighbor in self.discovered_map.get(current, []):
+                temp_g = g_score[current] + 1
+                if temp_g < g_score.get(neighbor, float('inf')):
+                    came_from[neighbor] = current
+                    g_score[neighbor] = temp_g
+                    f_score = temp_g + heuristic(neighbor, goal)
+                    heapq.heappush(pq, (f_score, neighbor))
+        return []
+
+def main():
+    print("--- Robot Maze AI Configuration ---")
+    n = int(input("Enter number of rows (N): "))
+    m = int(input("Enter number of columns (M): "))
+    
+    s_x, s_y = map(int, input("Enter Start Position (x y): ").split())
+    t_x, t_y = map(int, input("Enter Target Position (x y): ").split())
+    
+    print(f"\nEnter Maze Layout ({n}x{m}) - 0 for Path, 1 for Wall:")
+    maze = []
+    for i in range(n):
+        row = list(map(int, input(f"Row {i}: ").split()))
+        maze.append(row)
+
+    bot = RobotAI(n, m, (s_x, s_y))
+    found = bot.explore(maze, (t_x, t_y))
+
+    if found:
+        path_to_target = bot.a_star((s_x, s_y), (t_x, t_y))
+        return_path = bot.a_star((t_x, t_y), (s_x, s_y))
+        
+        print("\n--- Mission Summary ---")
+        print(f"Exploration Strategy: DFS with Backtracking")
+        print(f"Maze Discovery: {len(bot.discovered_map)} cells mapped")
+        print(f"Shortest path to target: {len(path_to_target)} steps")
+        print(f"Total exploration steps: {bot.total_steps}")
+        print(f"Return to start steps: {len(return_path)}")
+        print(f"Full Path to Target: {[(s_x, s_y)] + path_to_target}")
+    else:
+        print("\nTarget is unreachable or doesn't exist in the maze.")
+
+if __name__ == "__main__":
+    main()
