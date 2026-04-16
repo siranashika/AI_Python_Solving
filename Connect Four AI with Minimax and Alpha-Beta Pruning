@@ -1,0 +1,106 @@
+import sys
+
+def get_score(window, piece, human_piece, empty):
+    score = 0
+    opp_piece = human_piece if piece == 'R' else 'R'
+    if window.count(piece) == 4:
+        score += 1000
+    elif window.count(piece) == 3 and window.count(empty) == 1:
+        score += 100
+    elif window.count(piece) == 2 and window.count(empty) == 2:
+        score += 10
+    if window.count(opp_piece) == 3 and window.count(empty) == 1:
+        score -= 100
+    elif window.count(opp_piece) == 2 and window.count(empty) == 2:
+        score -= 10
+    return score
+
+def evaluate_board(b, stats):
+    stats["evaluated"] += 1
+    score = 0
+    rows, cols = 6, 7
+    ai, human, empty = 'R', 'Y', '.'
+    center_array = [b[r][cols//2] for r in range(rows)]
+    score += center_array.count(ai) * 3
+    score -= center_array.count(human) * 3
+    for r in range(rows):
+        row_array = b[r]
+        for c in range(cols - 3):
+            window = row_array[c:c+4]
+            score += get_score(window, ai, human, empty)
+    for c in range(cols):
+        col_array = [b[r][c] for r in range(rows)]
+        for r in range(rows - 3):
+            window = col_array[r:r+4]
+            score += get_score(window, ai, human, empty)
+    for r in range(rows - 3):
+        for c in range(cols - 3):
+            window = [b[r+3-i][c+i] for i in range(4)]
+            score += get_score(window, ai, human, empty)
+    for r in range(rows - 3):
+        for c in range(cols - 3):
+            window = [b[r+i][c+i] for i in range(4)]
+            score += get_score(window, ai, human, empty)
+    return score
+
+def get_valid_locations(b):
+    return [c for c in range(7) if b[0][c] == '.']
+
+def get_next_open_row(b, col):
+    for r in range(5, -1, -1):
+        if b[r][col] == '.':
+            return r
+
+def minimax(b, depth, alpha, beta, maximizingPlayer, stats):
+    valid_locations = get_valid_locations(b)
+    if depth == 0 or not valid_locations:
+        return (None, evaluate_board(b, stats))
+    if maximizingPlayer:
+        value = -float('inf')
+        column = valid_locations[0]
+        for col in valid_locations:
+            row = get_next_open_row(b, col)
+            b_copy = [r[:] for r in b]
+            b_copy[row][col] = 'R'
+            new_score = minimax(b_copy, depth - 1, alpha, beta, False, stats)[1]
+            if new_score > value:
+                value = new_score
+                column = col
+            alpha = max(alpha, value)
+            if alpha >= beta:
+                stats["pruned"] += 1
+                break
+        return column, value
+    else:
+        value = float('inf')
+        column = valid_locations[0]
+        for col in valid_locations:
+            row = get_next_open_row(b, col)
+            b_copy = [r[:] for r in b]
+            b_copy[row][col] = 'Y'
+            new_score = minimax(b_copy, depth - 1, alpha, beta, True, stats)[1]
+            if new_score < value:
+                value = new_score
+                column = col
+            beta = min(beta, value)
+            if alpha >= beta:
+                stats["pruned"] += 1
+                break
+        return column, value
+
+def solve():
+    input_data = sys.stdin.read().split()
+    if not input_data:
+        return
+    depth_limit = int(input_data[0])
+    board_rows = input_data[1:7]
+    board = [list(row) for row in board_rows]
+    stats = {"evaluated": 0, "pruned": 0}
+    col, score = minimax(board, depth_limit, -float('inf'), float('inf'), True, stats)
+    print(f"AI chooses column: {col + 1}")
+    print(f"Expected score: {score}")
+    print(f"Positions evaluated: {stats['evaluated']}")
+    print(f"Branches pruned: {stats['pruned']}")
+
+if __name__ == "__main__":
+    solve()
