@@ -1,0 +1,79 @@
+import itertools
+import math
+
+def calculate_distance(p1, p2):
+    return math.sqrt((p1[0] - p2[0])**2 + (p1[1] - p2[1])**2)
+
+def solve_delivery_optimization(restaurant, orders, num_executives, max_capacity):
+    orders = sorted(orders, key=lambda x: x[3])
+    batches = []
+    remaining_orders = list(orders)
+    
+    while remaining_orders:
+        current_batch = [remaining_orders.pop(0)]
+        while len(current_batch) < max_capacity and remaining_orders:
+            last_item = current_batch[-1]
+            nearest = min(remaining_orders, key=lambda x: calculate_distance((last_item[1], last_item[2]), (x[1], x[2])))
+            current_batch.append(nearest)
+            remaining_orders.remove(nearest)
+        batches.append(current_batch)
+    
+    final_output = []
+    for i, batch in enumerate(batches):
+        exec_id = (i % num_executives) + 1
+        departure_time = max(o[3] for o in batch)
+        best_perm = None
+        min_dist = float('inf')
+        
+        for perm in itertools.permutations(batch):
+            current_time = departure_time
+            total_dist = 0
+            prev_loc = restaurant
+            route_details = []
+            valid = True
+            
+            for order in perm:
+                d = calculate_distance(prev_loc, (order[1], order[2]))
+                current_time += d
+                total_dist += d
+                time_since_prep = current_time - order[3]
+                
+                if time_since_prep > 45:
+                    valid = False
+                    break
+                
+                route_details.append({"id": order[0], "time": round(time_since_prep, 2)})
+                prev_loc = (order[1], order[2])
+            
+            if valid and total_dist < min_dist:
+                min_dist = total_dist
+                best_perm = {"exec": exec_id, "route": [o[0] for o in perm], "details": route_details}
+        
+        if best_perm:
+            final_output.append(best_perm)
+            
+    return final_output
+
+rx = float(input())
+ry = float(input())
+rest_pos = (rx, ry)
+
+n = int(input())
+order_list = []
+for i in range(n):
+    oid = input()
+    ox = float(input())
+    oy = float(input())
+    pt = float(input())
+    order_list.append((oid, ox, oy, pt))
+
+execs = int(input())
+cap = int(input())
+
+results = solve_delivery_optimization(rest_pos, order_list, execs, cap)
+
+for res in results:
+    route_str = " -> ".join(map(str, res['route']))
+    print("Executive " + str(res['exec']) + ": " + route_str)
+    for d in res['details']:
+        print("  Order " + str(d['id']) + ": " + str(d['time']) + " min")
