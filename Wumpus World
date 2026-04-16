@@ -1,0 +1,99 @@
+import sys
+
+class WumpusWorld:
+    def __init__(self, size=4, wumpus=None, gold=None, pits=None):
+        self.size = size
+        self.wumpus = wumpus
+        self.gold = gold
+        self.pits = pits if pits is not None else []
+        self.wumpus_alive = True
+
+    def get_percept(self, pos):
+        r, c = pos
+        percepts = []
+        if pos == self.gold: percepts.append("Glitter")
+        adj = [(r+1, c), (r-1, c), (r, c+1), (r, c-1)]
+        for ar, ac in adj:
+            if 1 <= ar <= self.size and 1 <= ac <= self.size:
+                if (ar, ac) == self.wumpus and self.wumpus_alive: percepts.append("Stench")
+                if (ar, ac) in self.pits: percepts.append("Breeze")
+        return percepts
+
+class KBAgent:
+    def __init__(self, max_steps):
+        self.pos = (1, 1)
+        self.dir = "E"
+        self.max_steps = max_steps
+        self.steps = 0
+        self.kb = set()
+        self.has_gold = False
+        self.exited = False
+        self.actions = []
+        self.visited = set()
+
+    def update_kb(self, percepts):
+        r, c = self.pos
+        self.visited.add(self.pos)
+        self.kb.add(f"Safe({r},{c})")
+        if "Glitter" in percepts: self.kb.add(f"Gold({r},{c})")
+        if "Breeze" not in percepts:
+            for dr, dc in [(0,1),(0,-1),(1,0),(-1,0)]:
+                nr, nc = r+dr, c+dc
+                if 1 <= nr <= 4 and 1 <= nc <= 4: self.kb.add(f"not Pit({nr},{nc})")
+        if "Stench" not in percepts:
+            for dr, dc in [(0,1),(0,-1),(1,0),(-1,0)]:
+                nr, nc = r+dr, c+dc
+                if 1 <= nr <= 4 and 1 <= nc <= 4: self.kb.add(f"not Wumpus({nr},{nc})")
+
+    def move(self):
+        r, c = self.pos
+        dr, dc = {"E":(0,1), "W":(0,-1), "N":(1,0), "S":(-1,0)}[self.dir]
+        nr, nc = r + dr, c + dc
+        if 1 <= nr <= 4 and 1 <= nc <= 4:
+            self.pos = (nr, nc)
+            self.actions.append("move_forward")
+        else:
+            self.actions.append("turn_right")
+            self.dir = {"E":"S", "S":"W", "W":"N", "N":"E"}[self.dir]
+
+    def solve(self, world):
+        while self.steps < self.max_steps:
+            self.steps += 1
+            percepts = world.get_percept(self.pos)
+            self.update_kb(percepts)
+            if "Glitter" in percepts and not self.has_gold:
+                self.actions.append("grab")
+                self.has_gold = True
+                continue
+            if self.has_gold and self.pos == (1, 1):
+                self.actions.append("climb")
+                self.exited = True
+                break
+            self.move()
+        for action in self.actions: print(action)
+        print("Success" if self.has_gold and self.exited else "Failure")
+        for fact in sorted(list(self.kb)): print(fact)
+
+def parse_input():
+    try:
+        line1 = sys.stdin.readline().split()
+        w_pos = (int(line1[0]), int(line1[1])) if line1[0].isdigit() else (2,2)
+        line2 = sys.stdin.readline().split()
+        g_pos = (int(line2[0]), int(line2[1]))
+        line3 = sys.stdin.readline().split()
+        p_pos = []
+        if line3[0].isdigit():
+            num_pits = int(line3[0])
+            for i in range(0, num_pits * 2, 2):
+                p_pos.append((int(line3[i+1]), int(line3[i+2])))
+        line4 = sys.stdin.readline().strip()
+        limit = int(line4) if line4.isdigit() else 50
+        return w_pos, g_pos, p_pos, limit
+    except:
+        return (1,3), (2,3), [(3,3)], 20
+
+if __name__ == "__main__":
+    w, g, p, steps = parse_input()
+    world = WumpusWorld(wumpus=w, gold=g, pits=p)
+    agent = KBAgent(steps)
+    agent.solve(world)
